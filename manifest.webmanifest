@@ -1,0 +1,16 @@
+{
+  "name": "الجهد المعرفي",
+  "short_name": "الجهد المعرفي",
+  "description": "منظّم يومي لطالب الطب: معركة كبرى واحدة، مهام منخفضة الطاقة، وصندوق تفريغ الدماغ.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3efe8",
+  "theme_color": "#f3efe8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
