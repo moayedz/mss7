@@ -1088,8 +1088,19 @@
   checkRollover();
   render();
 
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    // When a new version takes over, reload once so it shows without reopening the app
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !reloaded) { reloaded = true; location.reload(); }
+    });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => {
+        reg.update();
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+      })
+      .catch(() => {});
   }
 })();
 </script>
