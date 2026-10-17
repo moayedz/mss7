@@ -200,6 +200,36 @@
   .day-dot.l2 { background: color-mix(in srgb, var(--olive) 55%, var(--olive-soft)); color: var(--surface); border-color: transparent; }
   .day-dot.l3 { background: var(--olive); color: var(--surface); border-color: transparent; }
   .day-dot.today { outline: 1.5px solid var(--ink-soft); outline-offset: 2px; }
+  .day-dot { height: 40px; align-content: center; gap: 1px; line-height: 1.1; }
+  .day-dot .ab { font-size: 9px; font-weight: 700; letter-spacing: .03em; }
+
+  .neglect { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .neglect div {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 12px; padding: 8px 10px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft);
+  }
+  .neglect div b { font-weight: 600; color: var(--ink); }
+  .neglect div.stale { border-color: var(--danger); }
+  .neglect div.stale span { color: var(--danger); }
+
+  /* Subjects */
+  .subjects { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .subj {
+    font-size: 12px; padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink-soft);
+  }
+  .subj.on { background: var(--navy); border-color: var(--navy); color: var(--bg); }
+
+  /* Exam countdown */
+  .exam {
+    position: relative; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+    font-size: 12px; color: var(--ink-soft); background: var(--surface-2);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .exam b { color: var(--ink); font-weight: 700; }
+  .exam.near { background: var(--olive-soft); }
+  .exam input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
 
   footer { text-align: center; font-size: 12px; color: var(--ink-faint); }
 
@@ -232,6 +262,10 @@
     <div>
       <div class="date-day" id="dayName"></div>
       <h1 class="date-main" id="dateMain"></h1>
+      <label class="exam" id="exam">
+        <span id="examText"></span>
+        <input type="date" id="examDate" aria-label="موعد الامتحان">
+      </label>
     </div>
     <div class="header-actions">
       <button class="icon-btn" id="newDayBtn" aria-label="يوم جديد">
@@ -244,8 +278,9 @@
   <section>
     <div class="section-label"><strong>المعركة الكبرى</strong><span>The Core Focus</span></div>
     <div class="core" id="core">
+      <div class="subjects" id="subjects"></div>
       <div class="core-top">
-        <textarea class="core-title" id="coreTitle" rows="1" placeholder="محاضرة اليوم الواحدة…" aria-label="المعركة الكبرى"></textarea>
+        <textarea class="core-title" id="coreTitle" rows="1" placeholder="اسم الدرس الواحد اليوم…" aria-label="المعركة الكبرى"></textarea>
         <svg class="ring" viewBox="0 0 56 56" aria-hidden="true">
           <circle class="track" cx="28" cy="28" r="24"/>
           <circle class="bar" id="ringBar" cx="28" cy="28" r="24"/>
@@ -267,7 +302,7 @@
         <div class="arrow">↓</div>
         <button class="stage" data-i="2">
           <span class="num">3</span>
-          <span class="txt"><div class="name">أسئلة Q-Bank / مراجعة Anki</div><div class="hint">استرجاع نشط، لا إعادة قراءة</div></span>
+          <span class="txt"><div class="name"><bdi>Çıkmış sorular</bdi> / <bdi>Anki</bdi></div><div class="hint">استرجاع نشط، لا إعادة قراءة</div></span>
         </button>
       </div>
       <div class="verdict" id="verdict"></div>
@@ -299,6 +334,7 @@
   <section>
     <div class="section-label"><strong>آخر ١٤ يوماً</strong><span>المراحل المنجزة من المعركة الكبرى</span></div>
     <div class="history" id="history"></div>
+    <div class="neglect" id="neglect"></div>
   </section>
 
   <footer>دقيقة واحدة صباحاً لتحديد المعركة. الباقي يتدفّق مع اليوم.</footer>
@@ -320,7 +356,15 @@
 (() => {
   const KEY = 'clt.v1';
   const MAX_LOW = 3;
-  const SUGGESTIONS = ['بطاقات Flashcards سريعة', 'ترتيب سلايدات ومراجع الغد', 'تفريغ تسجيل صوتي', 'نقل ملاحظات'];
+  const SUGGESTIONS = ['مراجعة بطاقات Anki المستحقة', 'حل 10 أسئلة çıkmış', 'ترتيب سلايدات الدرس الجاي', 'تفريغ تسجيل صوتي'];
+  const SUBJECTS = [
+    { name: 'Biyokimya', ab: 'BK' },
+    { name: 'Biyofizik', ab: 'BF' },
+    { name: 'Biyoistatistik', ab: 'BS' },
+    { name: 'Tıbbi Biyoloji', ab: 'TB' }
+  ];
+  const DEFAULT_EXAM = { name: 'Kurul 2', date: '2026-12-11' };
+  const STALE_DAYS = 4;
   const VERDICTS = [
     'ابدأ بالمرحلة الأولى. خطوة واحدة تكفي الآن.',
     'بدأت المعركة. الفهم الأول هو الأصعب.',
@@ -328,19 +372,24 @@
     'يومك ناجح طبياً. كل ما بعد هذا إضافة.'
   ];
 
-  const todayKey = () => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-  const freshDay = (date) => ({ date, core: { title: '', stages: [false, false, false] }, low: [] });
+  const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayKey = () => dateKey(new Date());
+  const freshDay = (date) => ({ date, core: { title: '', subject: '', stages: [false, false, false] }, low: [] });
+  // Old history entries were a plain stage count
+  const histVal = (v) => (typeof v === 'number' ? { n: v, s: '' } : v || { n: 0, s: '' });
+  const daysWord = (n) => (n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? `${n} أيام` : `${n} يوماً`);
   const uid = () => Math.random().toString(36).slice(2, 10);
 
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && s.day) return s;
+      if (s && s.day) {
+        s.exam = s.exam || { ...DEFAULT_EXAM };
+        s.day.core.subject = s.day.core.subject || '';
+        return s;
+      }
     } catch (e) {}
-    return { day: freshDay(todayKey()), dump: [], history: {} };
+    return { day: freshDay(todayKey()), dump: [], history: {}, exam: { ...DEFAULT_EXAM } };
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -350,16 +399,17 @@
 
   function archiveDay() {
     const done = state.day.core.stages.filter(Boolean).length;
-    if (state.day.core.title || done) state.history[state.day.date] = done;
+    const { title, subject } = state.day.core;
+    if (title || subject || done) state.history[state.day.date] = { n: done, s: subject };
     // keep history bounded
     const keys = Object.keys(state.history).sort();
     while (keys.length > 60) delete state.history[keys.shift()];
   }
   function startNewDay(keepCore) {
     archiveDay();
-    const title = keepCore ? state.day.core.title : '';
+    const { title, subject } = state.day.core;
     state.day = freshDay(todayKey());
-    state.day.core.title = title;
+    if (keepCore) Object.assign(state.day.core, { title, subject });
     save(); render();
   }
   // Auto-roll over when the page is opened on a new calendar day
@@ -450,14 +500,55 @@
     const today = todayKey();
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const v = k === today ? state.day.core.stages.filter(Boolean).length : (state.history[k] || 0);
-      out.push(`<div class="day-dot ${v ? 'l' + v : ''} ${k === today ? 'today' : ''}" title="${k}: ${v}/3">${d.getDate()}</div>`);
+      const k = dateKey(d);
+      const { n, s } = k === today ? todayVal() : histVal(state.history[k]);
+      const ab = (SUBJECTS.find(x => x.name === s) || {}).ab;
+      out.push(`<div class="day-dot ${n ? 'l' + n : ''} ${k === today ? 'today' : ''}" title="${k}: ${n}/3 ${s}">
+        <span>${d.getDate()}</span>${ab ? `<span class="ab">${ab}</span>` : ''}</div>`);
     }
     $('history').innerHTML = out.join('');
   }
 
-  function render() { renderDate(); renderCore(); renderLow(); renderDump(); renderHistory(); }
+  function todayVal() {
+    return { n: state.day.core.stages.filter(Boolean).length, s: state.day.core.subject };
+  }
+
+  // Days since each subject last had at least one stage done
+  function renderNeglect() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const last = {};
+    const t = todayVal();
+    if (t.s && t.n) last[t.s] = 0;
+    for (const [k, v] of Object.entries(state.history)) {
+      const { n, s } = histVal(v);
+      if (!s || !n) continue;
+      const days = Math.round((today - new Date(k + 'T00:00')) / 864e5);
+      if (last[s] === undefined || days < last[s]) last[s] = days;
+    }
+    $('neglect').innerHTML = SUBJECTS.map(({ name }) => {
+      const d = last[name];
+      const label = d === undefined ? '—' : d === 0 ? 'اليوم' : d === 1 ? 'أمس' : `قبل ${daysWord(d)}`;
+      return `<div class="${d !== undefined && d >= STALE_DAYS ? 'stale' : ''}"><b dir="ltr">${name}</b><span>${label}</span></div>`;
+    }).join('');
+  }
+
+  function renderSubjects() {
+    $('subjects').innerHTML = SUBJECTS.map(({ name }) =>
+      `<button class="subj ${state.day.core.subject === name ? 'on' : ''}" data-s="${name}" dir="ltr">${name}</button>`).join('');
+  }
+
+  function renderExam() {
+    const { name, date } = state.exam;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.round((new Date(date + 'T00:00') - today) / 864e5);
+    $('examDate').value = date;
+    $('exam').classList.toggle('near', days >= 0 && days <= 14);
+    $('examText').innerHTML = days > 0
+      ? `امتحان <bdi>${esc(name)}</bdi> بعد <b>${daysWord(days)}</b>`
+      : days === 0 ? `امتحان <bdi>${esc(name)}</bdi> اليوم. بالتوفيق` : 'حدّد موعد الامتحان القادم';
+  }
+
+  function render() { renderDate(); renderExam(); renderSubjects(); renderCore(); renderLow(); renderDump(); renderHistory(); renderNeglect(); }
 
   // Events: core
   $('coreTitle').addEventListener('input', (e) => {
@@ -468,7 +559,22 @@
     const i = +b.dataset.i;
     state.day.core.stages[i] = !state.day.core.stages[i];
     if (navigator.vibrate) navigator.vibrate(10);
-    save(); renderCore(); renderHistory();
+    save(); renderCore(); renderHistory(); renderNeglect();
+  });
+  $('subjects').addEventListener('click', (e) => {
+    const b = e.target.closest('.subj'); if (!b) return;
+    const c = state.day.core;
+    c.subject = c.subject === b.dataset.s ? '' : b.dataset.s;
+    save(); renderSubjects(); renderHistory(); renderNeglect();
+  });
+  $('examDate').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    state.exam.date = e.target.value;
+    if (new Date(e.target.value + 'T00:00') > new Date()) {
+      const n = prompt('اسم الامتحان؟', state.exam.name);
+      if (n && n.trim()) state.exam.name = n.trim();
+    }
+    save(); renderExam();
   });
 
   // Events: low energy
@@ -527,7 +633,7 @@
   $('carryCore').addEventListener('click', () => { sheet.classList.remove('open'); startNewDay(true); });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { checkRollover(); renderDate(); }
+    if (document.visibilityState === 'visible') { checkRollover(); renderDate(); renderExam(); }
   });
 
   checkRollover();

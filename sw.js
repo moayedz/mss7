@@ -1,5 +1,5 @@
 // Offline cache: serve from cache, refresh in the background.
-const CACHE = 'clt-v1';
+const CACHE = 'clt-v2';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
