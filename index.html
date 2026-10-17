@@ -308,6 +308,8 @@
     font-size: 16px; min-height: 120px; padding: 12px; margin-bottom: 12px;
     border: 1px dashed var(--line); border-radius: 12px; resize: vertical;
   }
+  #impPaste { width: 100%; margin-bottom: 14px; }
+  #impPaste[hidden], #impAdd[hidden] { display: none; }
   .imp-help { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; }
   .imp-help summary { cursor: pointer; font-weight: 600; color: var(--ink); }
   .imp-help ol { padding-inline-start: 20px; margin: 8px 0 0; line-height: 1.8; }
@@ -431,6 +433,7 @@
     <h2 id="impTitle">محاضرات من التقويم</h2>
     <p id="impMsg"></p>
     <div class="imp-list" id="impList"></div>
+    <button class="btn primary" id="impPaste">لصق من الاختصار</button>
     <textarea id="impText" hidden placeholder="الصق هنا، كل محاضرة بسطر"></textarea>
     <details class="imp-help" id="impHelp">
       <summary>كيف أجهّز اختصار التقويم؟</summary>
@@ -816,6 +819,8 @@
 
   // Calendar import: a Shortcut copies today's event titles, one per line
   const fold = (t) => t.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i');
+  // University course codes ("TIP1205 - …") mark an event as a lecture
+  const COURSE_CODE = /^\s*TIP\s*\d{3,4}\s*[-–—:|]?\s*/i;
   const detectSubject = (t) => (SUBJECTS.find(x => x.keys.some(k => fold(t).includes(k))) || {}).name || '';
   let impRows = [];
 
@@ -842,36 +847,45 @@
   }
 
   function showRows(text) {
-    impRows = parseEvents(text).map(raw => {
+    impRows = parseEvents(text).map(line => {
+      const isCourse = COURSE_CODE.test(line);
+      const raw = line.replace(COURSE_CODE, '');
       const subject = detectSubject(raw);
       // "Tıbbi Biyokimya - Enzim Kinetiği" → "Enzim Kinetiği" (the subject is shown on its own)
       const m = raw.match(/^(.+?)\s*[-–—:|]\s*(.+)$/);
       const title = subject && m && detectSubject(m[1]) === subject && !detectSubject(m[2]) ? m[2] : raw;
-      // Events without a known subject (gym, appointments) start unticked
-      return { title, subject, on: !!subject };
+      // Anything that isn't a course or a known subject (gym, meetings) starts unticked
+      return { title, subject, on: isCourse || !!subject };
     });
     $('impText').hidden = true;
+    $('impPaste').hidden = true;
+    $('impAdd').hidden = false;
     $('impMsg').textContent = impRows.length
-      ? 'المحاضرات اللي عرفت مادتها محددة. شيل أو حط ✓ واضغط على المادة لتغييرها.'
+      ? 'المحاضرات محددة ✓ والباقي لأ. اضغط على "مادة؟" لتختار مادة كل محاضرة.'
       : 'ما لقيت أحداث بالنسخة. شغّل الاختصار أول.';
     renderImport();
   }
 
-  async function openImport() {
-    $('impSheet').classList.add('open');
+  function openImport() {
     impRows = []; $('impList').innerHTML = '';
+    $('impText').hidden = true; $('impPaste').hidden = false; $('impAdd').hidden = true;
+    $('impMsg').textContent = 'شغّل اختصار "محاضرات اليوم"، وبعدين اضغط الزر تحت. الآيفون رح يطلّع كلمة Paste: اضغطها، هيك بيعطي إذن للتطبيق يقرأ اللي نسخه الاختصار.';
+    $('impSheet').classList.add('open');
+  }
+
+  // iOS shows its own "Paste" button here; the read only succeeds once it's tapped
+  async function pasteImport() {
     let text = '';
     try { text = await navigator.clipboard.readText(); } catch (e) {}
-    if (text.trim()) {
-      showRows(text);
-    } else {
-      $('impText').hidden = false; $('impText').value = '';
-      $('impMsg').textContent = 'شغّل اختصار "محاضرات اليوم"، وبعدين الصق هنا (اضغط مطوّلاً ← لصق).';
-      renderImport();
-    }
+    if (text.trim()) return showRows(text);
+    $('impPaste').hidden = true; $('impAdd').hidden = false;
+    $('impText').hidden = false; $('impText').value = '';
+    $('impMsg').textContent = 'ما قدرت أقرأ النسخ. اضغط مطوّلاً على الخانة تحت واختر لصق.';
+    renderImport();
   }
 
   $('calBtn').addEventListener('click', openImport);
+  $('impPaste').addEventListener('click', pasteImport);
   $('impText').addEventListener('input', (e) => { if (e.target.value.includes('\n') || e.target.value.length > 3) showRows(e.target.value); });
   $('impList').addEventListener('click', (e) => {
     const row = e.target.closest('.imp-row'); if (!row) return;
