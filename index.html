@@ -307,6 +307,48 @@
   .imp-row .s.set { background: var(--surface-2); border-color: transparent; color: var(--ink-soft); }
   .imp-row.dup { opacity: .5; }
   #impAdd[hidden] { display: none; }
+
+  /* Empty lecture day */
+  .lec-empty { font-size: 13px; color: var(--ink-soft); line-height: 1.7; }
+  .lec-empty .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .lec-empty .acts button {
+    font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 12px;
+    background: var(--surface-2); color: var(--ink);
+  }
+
+  /* Day tasks */
+  .task .tm { font-size: 12px; color: var(--ink-faint); flex: none; font-variant-numeric: tabular-nums; }
+  .task .rep { flex: none; color: var(--ink-faint); font-size: 12px; }
+  .task-add { display: flex; gap: 8px; margin-top: 8px; }
+  .task-add input {
+    font-size: 16px; padding: 10px 12px; border-radius: 12px;
+    border: 1px dashed var(--line); background: transparent;
+  }
+  .task-add input[type="time"] { flex: none; width: 104px; }
+  .link-btn { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Routines sheet */
+  .rt-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .rt {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px;
+    background: var(--bg); border: 1px solid var(--line); font-size: 14px;
+  }
+  .rt .t { flex: 1; min-width: 0; }
+  .rt .d { font-size: 12px; color: var(--ink-soft); }
+  .rt .x { width: 24px; height: 24px; display: grid; place-items: center; color: var(--ink-faint); }
+  .rt .x svg { width: 14px; height: 14px; }
+  .rt-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .rt-form .row { display: flex; gap: 8px; }
+  .rt-form input {
+    font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg);
+  }
+  .rt-form input[type="time"] { flex: none; width: 110px; }
+  .days { display: flex; gap: 6px; }
+  .days button {
+    flex: 1; padding: 8px 0; border-radius: 10px; font-size: 13px;
+    border: 1px solid var(--line); color: var(--ink-soft);
+  }
+  .days button.on { background: var(--navy); border-color: var(--navy); color: var(--bg); }
   .imp-day { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin: 8px 2px 2px; }
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -387,6 +429,16 @@
     <div class="chips" id="chips"></div>
   </section>
 
+  <!-- Day tasks (non-study) -->
+  <section>
+    <div class="section-label"><strong>مهام اليوم</strong><button class="link-btn" id="rtBtn">المهام المتكررة</button></div>
+    <div class="low-list" id="taskList"></div>
+    <form class="task-add" id="taskForm" autocomplete="off">
+      <input type="time" id="taskTime" aria-label="الوقت">
+      <input id="taskInput" placeholder="+ مهمة أو موعد اليوم…" enterkeyhint="done" aria-label="مهمة جديدة">
+    </form>
+  </section>
+
   <!-- 3. Brain dump -->
   <section>
     <div class="section-label"><strong>صندوق تفريغ الدماغ</strong><span>Brain Dump</span></div>
@@ -435,6 +487,23 @@
   </div>
 </div>
 
+<div class="sheet-backdrop" id="rtSheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rtTitle">
+    <h2 id="rtTitle">المهام المتكررة</h2>
+    <p>بتنضاف لحالها لمهام اليوم بالأيام اللي بتختارها: النادي، IHH، أي شي ثابت.</p>
+    <div class="rt-list" id="rtList"></div>
+    <form class="rt-form" id="rtForm" autocomplete="off">
+      <div class="row">
+        <input id="rtInput" placeholder="مثلاً: النادي" aria-label="اسم المهمة">
+        <input type="time" id="rtTime" aria-label="الوقت">
+      </div>
+      <div class="days" id="rtDays"></div>
+      <button class="btn primary" type="submit">أضف</button>
+    </form>
+    <div class="sheet-actions"><button class="btn quiet" id="rtClose">تم</button></div>
+  </div>
+</div>
+
 <script src="schedule.js"></script>
 <script>
 (() => {
@@ -460,7 +529,10 @@
 
   const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const todayKey = () => dateKey(new Date());
-  const freshDay = (date) => ({ date, lectures: [], current: null, low: [] });
+  const freshDay = (date) => ({ date, lectures: [], current: null, low: [], tasks: [] });
+  // Monday-first week, as on Turkish calendars; values are Date#getDay()
+  const WEEK = [[1, 'ن'], [2, 'ث'], [3, 'ر'], [4, 'خ'], [5, 'ج'], [6, 'س'], [0, 'ح']];
+  const DAY_NAMES = { 0: 'الأحد', 1: 'الاثنين', 2: 'الثلاثاء', 3: 'الأربعاء', 4: 'الخميس', 5: 'الجمعة', 6: 'السبت' };
   const newLecture = (title = '', subject = '', time = '') => ({ id: uid(), title, subject, time, stages: [false, false, false] });
   const stagesDone = (l) => l.stages.filter(Boolean).length;
   // Old history entries were a plain stage count
@@ -474,6 +546,8 @@
       if (s && s.day) {
         s.exam = s.exam || { ...DEFAULT_EXAM };
         s.done = s.done || {};
+        s.routines = s.routines || [];
+        s.day.tasks = s.day.tasks || [];
         // Older versions held a single `core` instead of a lecture list
         if (s.day.core) {
           const c = s.day.core;
@@ -489,7 +563,7 @@
         return s;
       }
     } catch (e) {}
-    return { day: freshDay(todayKey()), dump: [], history: {}, exam: { ...DEFAULT_EXAM }, done: {} };
+    return { day: freshDay(todayKey()), dump: [], history: {}, exam: { ...DEFAULT_EXAM }, done: {}, routines: [] };
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -521,7 +595,10 @@
     archiveDay();
     const carry = keepCore ? unfinished() : [];
     const current = state.day.current;
+    // One-off tasks left undone move to the new day; recurring ones come back on their own
+    const tasks = state.day.tasks.filter(t => !t.done && !t.rid);
     state.day = freshDay(todayKey());
+    state.day.tasks = tasks;
     state.day.lectures = carry;
     state.day.current = (carry.find(l => l.id === current) || carry[0] || {}).id || null;
     save(); render();
@@ -536,6 +613,20 @@
       startNewDay(true);
     }
     seedFromSchedule();
+    seedRoutines();
+  }
+
+  // Recurring tasks for today's weekday, added once per day
+  function seedRoutines() {
+    if (state.day.routinesSeeded) return;
+    state.day.routinesSeeded = true;
+    const wd = new Date(state.day.date + 'T00:00').getDay();
+    for (const r of state.routines) if (r.days.includes(wd)) addRoutineTask(r);
+    save();
+  }
+  function addRoutineTask(r) {
+    if (state.day.tasks.some(t => t.rid === r.id)) return;
+    state.day.tasks.push({ id: uid(), title: r.title, time: r.time, done: false, rid: r.id });
   }
 
   // Today's lectures from the kurul program, added once per day
@@ -591,6 +682,17 @@
   }
 
   function renderLectures() {
+    if (!state.day.lectures.length) {
+      const missed = missedLectures().length;
+      const next = nextLectures();
+      $('lecList').innerHTML = `<div class="lec-empty">
+        ما في محاضرات اليوم بالجدول. يوم مثالي ترجع فيه لدرس ما خلّصته، أو تحضّر للجاي.
+        <div class="acts">
+          ${missed ? `<button data-open="missed">دروس فاتتك (${missed})</button>` : ''}
+          ${next.length ? `<button data-open="next">حضّر ليوم ${DAY_NAMES[new Date(next[0].date + 'T00:00').getDay()]}</button>` : ''}
+        </div></div>`;
+      return;
+    }
     $('lecList').innerHTML = state.day.lectures.map(l => {
       const n = stagesDone(l);
       const cls = [l.id === state.day.current ? 'cur' : '', n === 3 ? 'fin' : ''].join(' ');
@@ -712,7 +814,7 @@
   }
 
   function renderBattle() { renderSubjects(); renderCore(); renderLectures(); renderHistory(); renderNeglect(); }
-  function render() { renderDate(); renderExam(); renderBattle(); renderLow(); renderDump(); }
+  function render() { renderDate(); renderExam(); renderBattle(); renderLow(); renderTasks(); renderDump(); }
 
   // Events: core
   $('coreTitle').addEventListener('input', (e) => {
@@ -756,6 +858,8 @@
     inp.value = ''; save(); renderBattle();
   });
   $('lecList').addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open]');
+    if (open) return openImport(open.dataset.open);
     const chip = e.target.closest('.lec'); if (!chip) return;
     const id = chip.dataset.id;
     if (e.target.closest('[data-act="del"]')) {
@@ -812,6 +916,78 @@
     const c = e.target.closest('.chip'); if (c) addLow(c.dataset.s);
   });
 
+  // Day tasks
+  function renderTasks() {
+    const tasks = [...state.day.tasks].sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+    $('taskList').innerHTML = tasks.map(t => `
+      <div class="low task ${t.done ? 'done' : ''}" data-id="${t.id}">
+        <button class="check" data-act="toggle" aria-label="تم">${icon.check}</button>
+        ${t.time ? `<span class="tm">${t.time}</span>` : ''}
+        <input value="${esc(t.title)}" data-act="edit" dir="auto" enterkeyhint="done">
+        ${t.rid ? '<span class="rep" title="متكررة">↻</span>' : ''}
+        <button class="del" data-act="del" aria-label="حذف">${icon.x}</button>
+      </div>`).join('');
+  }
+  $('taskForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = $('taskInput').value.trim(); if (!title) return;
+    state.day.tasks.push({ id: uid(), title, time: $('taskTime').value, done: false });
+    $('taskInput').value = ''; $('taskTime').value = '';
+    save(); renderTasks();
+  });
+  $('taskList').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]'); if (!btn || btn.dataset.act === 'edit') return;
+    const id = btn.closest('.task').dataset.id;
+    const t = state.day.tasks.find(x => x.id === id);
+    if (btn.dataset.act === 'toggle' && t) t.done = !t.done;
+    if (btn.dataset.act === 'del') state.day.tasks = state.day.tasks.filter(x => x.id !== id);
+    save(); renderTasks();
+  });
+  $('taskList').addEventListener('input', (e) => {
+    const t = state.day.tasks.find(x => x.id === e.target.closest('.task').dataset.id);
+    if (t) { t.title = e.target.value; save(); }
+  });
+  $('taskList').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+
+  // Recurring tasks
+  let rtDays = [];
+  function renderRoutines() {
+    $('rtList').innerHTML = state.routines.length ? state.routines.map(r => `
+      <div class="rt" data-id="${r.id}">
+        <span class="t" dir="auto">${esc(r.title)}${r.time ? ` · ${r.time}` : ''}
+          <div class="d">${WEEK.filter(([d]) => r.days.includes(d)).map(([d]) => DAY_NAMES[d]).join('، ')}</div></span>
+        <button class="x" aria-label="حذف">${icon.x}</button>
+      </div>`).join('') : '';
+    $('rtDays').innerHTML = WEEK.map(([d, l]) =>
+      `<button type="button" data-d="${d}" class="${rtDays.includes(d) ? 'on' : ''}" aria-label="${DAY_NAMES[d]}">${l}</button>`).join('');
+  }
+  $('rtBtn').addEventListener('click', () => { rtDays = []; renderRoutines(); $('rtSheet').classList.add('open'); });
+  $('rtClose').addEventListener('click', () => $('rtSheet').classList.remove('open'));
+  $('rtSheet').addEventListener('click', (e) => { if (e.target === $('rtSheet')) $('rtSheet').classList.remove('open'); });
+  $('rtDays').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-d]'); if (!b) return;
+    const d = +b.dataset.d;
+    rtDays = rtDays.includes(d) ? rtDays.filter(x => x !== d) : [...rtDays, d];
+    renderRoutines();
+  });
+  $('rtForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = $('rtInput').value.trim();
+    if (!title || !rtDays.length) { $('rtInput').focus(); return; }
+    const r = { id: uid(), title, time: $('rtTime').value, days: rtDays };
+    state.routines.push(r);
+    if (r.days.includes(new Date().getDay())) addRoutineTask(r);
+    $('rtInput').value = ''; $('rtTime').value = ''; rtDays = [];
+    save(); renderRoutines(); renderTasks();
+  });
+  $('rtList').addEventListener('click', (e) => {
+    const b = e.target.closest('.x'); if (!b) return;
+    const id = b.closest('.rt').dataset.id;
+    state.routines = state.routines.filter(r => r.id !== id);
+    state.day.tasks = state.day.tasks.filter(t => t.rid !== id || t.done);
+    save(); renderRoutines(); renderTasks();
+  });
+
   // Events: brain dump
   $('dumpForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -856,16 +1032,29 @@
     $('impAdd').hidden = !impRows.length;
   }
 
-  function openImport() {
-    impRows = missedLectures();
-    $('impMsg').textContent = impRows.length
-      ? 'دروس من الجدول لسا ما وصلت فيها للمرحلة الثالثة. اختار اللي بدك ترجعله اليوم.'
-      : 'ما في دروس فاتتك. كل اللي انعطى لهلأ خلّصته للآخر أو موجود بقائمة اليوم.';
+  // Lectures of the next day that has any, for studying ahead
+  function nextLectures() {
+    const today = todayKey();
+    const have = new Set(state.day.lectures.map(l => fold(l.title)));
+    const d = Object.keys(KURUL.days).sort().find(k => k > today);
+    return d ? KURUL.days[d].map(([, ab, title]) => ({ date: d, title, subject: subjectOf(ab), on: false }))
+      .filter(r => !state.done[fold(r.title)] && !have.has(fold(r.title))) : [];
+  }
+
+  function openImport(mode) {
+    const next = mode === 'next';
+    impRows = next ? nextLectures() : missedLectures();
+    $('impTitle').textContent = next ? 'حضّر للمحاضرات الجاية' : 'دروس فاتتك';
+    $('impMsg').textContent = next
+      ? 'محاضرات اليوم الجاي بالجدول. لو قرأت عنها قبل، بتفهمها بالمحاضرة أسرع.'
+      : impRows.length
+        ? 'دروس من الجدول لسا ما وصلت فيها للمرحلة الثالثة. اختار اللي بدك ترجعله اليوم.'
+        : 'ما في دروس فاتتك. كل اللي انعطى لهلأ خلّصته للآخر أو موجود بقائمة اليوم.';
     renderImport();
     $('impSheet').classList.add('open');
   }
 
-  $('calBtn').addEventListener('click', openImport);
+  $('calBtn').addEventListener('click', () => openImport('missed'));
   $('impList').addEventListener('click', (e) => {
     const row = e.target.closest('.imp-row'); if (!row) return;
     impRows[+row.dataset.i].on = !impRows[+row.dataset.i].on;
