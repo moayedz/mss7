@@ -158,6 +158,8 @@
   }
   .lec .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lec .p { font-size: 11px; color: var(--ink-faint); }
+  .lec .ab { font-size: 9px; font-weight: 700; letter-spacing: .03em; color: var(--ink-faint); }
+  .lec .tm { font-size: 11px; color: var(--ink-faint); }
   .lec .x { width: 20px; height: 20px; display: grid; place-items: center; color: var(--ink-faint); }
   .lec .x svg { width: 12px; height: 12px; }
   .lec.cur { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); font-weight: 600; }
@@ -302,17 +304,10 @@
     flex: none; font-size: 11px; padding: 3px 8px; border-radius: 999px;
     border: 1px solid var(--line); color: var(--ink-soft);
   }
-  .imp-row .s.set { background: var(--navy); border-color: var(--navy); color: var(--bg); }
+  .imp-row .s.set { background: var(--surface-2); border-color: transparent; color: var(--ink-soft); }
   .imp-row.dup { opacity: .5; }
-  #impText {
-    font-size: 16px; min-height: 120px; padding: 12px; margin-bottom: 12px;
-    border: 1px dashed var(--line); border-radius: 12px; resize: vertical;
-  }
-  #impPaste { width: 100%; margin-bottom: 14px; }
-  #impPaste[hidden], #impAdd[hidden] { display: none; }
-  .imp-help { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; }
-  .imp-help summary { cursor: pointer; font-weight: 600; color: var(--ink); }
-  .imp-help ol { padding-inline-start: 20px; margin: 8px 0 0; line-height: 1.8; }
+  #impAdd[hidden] { display: none; }
+  .imp-day { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin: 8px 2px 2px; }
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -373,14 +368,14 @@
         <div class="lec-head"><b>محاضرات اليوم</b>
           <button class="cal-btn" id="calBtn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-            من التقويم
+            دروس فاتتك
           </button>
         </div>
         <div class="lec-list" id="lecList"></div>
         <form class="lec-add" id="lecForm" autocomplete="off">
-          <input id="lecInput" placeholder="+ أضف محاضرة من جدول اليوم…" enterkeyhint="done" aria-label="محاضرة جديدة">
+          <input id="lecInput" placeholder="+ أضف درس من برّا الجدول…" enterkeyhint="done" aria-label="محاضرة جديدة">
         </form>
-        <div class="lec-hint">اضغط على محاضرة لتصير هي المعركة. كيف تختار؟ الأصعب أو الأطول، أو مادة صارلها أطول وقت (المربع الأحمر تحت). والباقي يستنّى لبكرا أو للمهام الخفيفة.</div>
+        <div class="lec-hint">محاضرات اليوم بتنزل لحالها من جدول الكورول. اضغط على وحدة لتصير هي المعركة. كيف تختار؟ الأصعب أو الأطول، أو مادة صارلها أطول وقت (المربع الأحمر تحت). والباقي يستنّى لبكرا أو للمهام الخفيفة.</div>
       </div>
     </div>
   </section>
@@ -430,22 +425,9 @@
 
 <div class="sheet-backdrop" id="impSheet">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="impTitle">
-    <h2 id="impTitle">محاضرات من التقويم</h2>
+    <h2 id="impTitle">دروس فاتتك</h2>
     <p id="impMsg"></p>
     <div class="imp-list" id="impList"></div>
-    <button class="btn primary" id="impPaste">لصق من الاختصار</button>
-    <textarea id="impText" hidden placeholder="الصق هنا، كل محاضرة بسطر"></textarea>
-    <details class="imp-help" id="impHelp">
-      <summary>كيف أجهّز اختصار التقويم؟</summary>
-      <ol>
-        <li>افتح تطبيق <b>الاختصارات</b> (Shortcuts) واضغط <b>+</b>.</li>
-        <li>أضف <b>Find Calendar Events</b> (البحث عن أحداث التقويم): <b>Start Date is Today</b>، ورتّبها حسب <b>Start Date</b>. إذا المحاضرات بتقويم لحالها، أضف شرط <b>Calendar is</b> واختاره.</li>
-        <li>أضف <b>Get Details of Calendar Events</b> واختر <b>Title</b>.</li>
-        <li>أضف <b>Combine Text</b> (دمج النص) واختر <b>New Lines</b>.</li>
-        <li>أضف <b>Copy to Clipboard</b> (نسخ إلى الحافظة).</li>
-        <li>سمّه "محاضرات اليوم". شغّله، وبعدين افتح هالتطبيق واضغط <b>من التقويم</b>.</li>
-      </ol>
-    </details>
     <div class="sheet-actions">
       <button class="btn primary" id="impAdd">أضف المحددة</button>
       <button class="btn quiet" id="impCancel">إلغاء</button>
@@ -453,8 +435,10 @@
   </div>
 </div>
 
+<script src="schedule.js"></script>
 <script>
 (() => {
+  const KURUL = window.KURUL || { name: '', exams: [], days: {} };
   const KEY = 'clt.v1';
   const MAX_LOW = 3;
   const SUGGESTIONS = ['مراجعة بطاقات Anki المستحقة', 'حل 10 أسئلة çıkmış', 'ترتيب سلايدات الدرس الجاي', 'تفريغ تسجيل صوتي'];
@@ -464,7 +448,8 @@
     { name: 'Biyoistatistik', ab: 'BS', keys: ['istatist', 'biostat'] },
     { name: 'Tıbbi Biyoloji', ab: 'TB', keys: ['biyoloji', 'genetik', 'biology'] }
   ];
-  const DEFAULT_EXAM = { name: 'Kurul 2', date: '2026-12-11' };
+  const DEFAULT_EXAM = { name: KURUL.name || 'الامتحان', date: (KURUL.exams.slice(-1)[0] || {}).date || '' };
+  const subjectOf = (ab) => (SUBJECTS.find(x => x.ab === ab) || {}).name || '';
   const STALE_DAYS = 4;
   const VERDICTS = [
     'ابدأ بالمرحلة الأولى. خطوة واحدة تكفي الآن.',
@@ -476,7 +461,7 @@
   const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const todayKey = () => dateKey(new Date());
   const freshDay = (date) => ({ date, lectures: [], current: null, low: [] });
-  const newLecture = (title = '', subject = '') => ({ id: uid(), title, subject, stages: [false, false, false] });
+  const newLecture = (title = '', subject = '', time = '') => ({ id: uid(), title, subject, time, stages: [false, false, false] });
   const stagesDone = (l) => l.stages.filter(Boolean).length;
   // Old history entries were a plain stage count
   const histVal = (v) => (typeof v === 'number' ? { n: v, s: '' } : v || { n: 0, s: '' });
@@ -488,6 +473,7 @@
       const s = JSON.parse(localStorage.getItem(KEY));
       if (s && s.day) {
         s.exam = s.exam || { ...DEFAULT_EXAM };
+        s.done = s.done || {};
         // Older versions held a single `core` instead of a lecture list
         if (s.day.core) {
           const c = s.day.core;
@@ -503,7 +489,7 @@
         return s;
       }
     } catch (e) {}
-    return { day: freshDay(todayKey()), dump: [], history: {}, exam: { ...DEFAULT_EXAM } };
+    return { day: freshDay(todayKey()), dump: [], history: {}, exam: { ...DEFAULT_EXAM }, done: {} };
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -549,6 +535,18 @@
     if (state.day.date !== todayKey()) {
       startNewDay(true);
     }
+    seedFromSchedule();
+  }
+
+  // Today's lectures from the kurul program, added once per day
+  function seedFromSchedule() {
+    if (state.day.seeded) return;
+    state.day.seeded = true;
+    const have = new Set(state.day.lectures.map(l => fold(l.title)));
+    for (const [time, ab, title] of KURUL.days[state.day.date] || []) {
+      if (!have.has(fold(title))) state.day.lectures.push(newLecture(title, subjectOf(ab), time));
+    }
+    save();
   }
 
   const $ = (id) => document.getElementById(id);
@@ -596,8 +594,11 @@
     $('lecList').innerHTML = state.day.lectures.map(l => {
       const n = stagesDone(l);
       const cls = [l.id === state.day.current ? 'cur' : '', n === 3 ? 'fin' : ''].join(' ');
+      const ab = (SUBJECTS.find(x => x.name === l.subject) || {}).ab;
       return `<span class="lec ${cls}" data-id="${l.id}" role="button" tabindex="0">
+        ${l.time ? `<span class="tm">${l.time}</span>` : ''}
         <span class="t" dir="auto">${esc(l.title || 'بدون اسم')}</span>
+        ${ab ? `<span class="ab">${ab}</span>` : ''}
         <span class="p">${n === 3 ? '✓' : n ? n + '/3' : ''}</span>
         <button class="x" data-act="del" aria-label="حذف">${icon.x}</button></span>`;
     }).join('');
@@ -650,7 +651,7 @@
       const d = new Date(); d.setDate(d.getDate() - i);
       const k = dateKey(d);
       const { n, s } = k === today ? todayVal() : histVal(state.history[k]);
-      const ab = (SUBJECTS.find(x => x.name === s) || {}).ab;
+      const ab = n ? (SUBJECTS.find(x => x.name === s) || {}).ab : '';
       out.push(`<div class="day-dot ${n ? 'l' + n : ''} ${k === today ? 'today' : ''}" title="${k}: ${n}/3 ${s}">
         <span>${d.getDate()}</span>${ab ? `<span class="ab">${ab}</span>` : ''}</div>`);
     }
@@ -697,14 +698,17 @@
   }
 
   function renderExam() {
-    const { name, date } = state.exam;
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const days = Math.round((new Date(date + 'T00:00') - today) / 864e5);
-    $('examDate').value = date;
-    $('exam').classList.toggle('near', days >= 0 && days <= 14);
-    $('examText').innerHTML = days > 0
-      ? `امتحان <bdi>${esc(name)}</bdi> بعد <b>${daysWord(days)}</b>`
-      : days === 0 ? `امتحان <bdi>${esc(name)}</bdi> اليوم. بالتوفيق` : 'حدّد موعد الامتحان القادم';
+    // A date picked by hand replaces the kurul's own exam dates
+    const exams = (state.exam.custom ? [state.exam] : KURUL.exams)
+      .map(e => ({ ...e, days: Math.round((new Date(e.date + 'T00:00') - today) / 864e5) }))
+      .filter(e => e.days >= 0);
+    const next = exams[0];
+    $('examDate').value = next ? next.date : '';
+    $('exam').classList.toggle('near', !!next && next.days <= 14);
+    $('examText').innerHTML = !next ? 'حدّد موعد الامتحان القادم' : exams.map(e => e.days === 0
+      ? `امتحان <bdi>${esc(e.name)}</bdi> اليوم. بالتوفيق`
+      : `<bdi>${esc(e.name)}</bdi> بعد <b>${daysWord(e.days)}</b>`).join(' · ');
   }
 
   function renderBattle() { renderSubjects(); renderCore(); renderLectures(); renderHistory(); renderNeglect(); }
@@ -718,6 +722,10 @@
     const b = e.target.closest('.stage'); if (!b) return;
     const l = ensureCur(); const i = +b.dataset.i;
     l.stages[i] = !l.stages[i];
+    if (l.title) {
+      if (stagesDone(l) === 3) state.done[fold(l.title)] = state.day.date;
+      else delete state.done[fold(l.title)];
+    }
     if (navigator.vibrate) navigator.vibrate(10);
     save(); renderBattle();
   });
@@ -763,6 +771,7 @@
   $('examDate').addEventListener('change', (e) => {
     if (!e.target.value) return;
     state.exam.date = e.target.value;
+    state.exam.custom = true;
     if (new Date(e.target.value + 'T00:00') > new Date()) {
       const n = prompt('اسم الامتحان؟', state.exam.name);
       if (n && n.trim()) state.exam.name = n.trim();
@@ -817,93 +826,53 @@
     state.dump = state.dump.filter(x => x.id !== id); save(); renderDump();
   });
 
-  // Calendar import: a Shortcut copies today's event titles, one per line
   const fold = (t) => t.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i');
-  // University course codes ("TIP1205 - …") mark an event as a lecture
-  const COURSE_CODE = /^\s*TIP\s*\d{3,4}\s*[-–—:|]?\s*/i;
   const detectSubject = (t) => (SUBJECTS.find(x => x.keys.some(k => fold(t).includes(k))) || {}).name || '';
   let impRows = [];
 
-  function parseEvents(text) {
-    const seen = new Set();
-    return text.split(/\r?\n/)
-      .map(l => l.replace(/^\s*\d{1,2}[:.]\d{2}\s*[-–]?\s*/, '').trim())
-      .filter(l => l && !seen.has(fold(l)) && seen.add(fold(l)));
+  // Scheduled lectures up to yesterday that were never taken to 3/3, newest first
+  function missedLectures() {
+    const today = todayKey();
+    const have = new Set(state.day.lectures.map(l => fold(l.title)));
+    return Object.keys(KURUL.days).filter(d => d < today).sort().reverse()
+      .flatMap(d => KURUL.days[d].map(([, ab, title]) => ({ date: d, title, subject: subjectOf(ab), on: false })))
+      .filter(r => !state.done[fold(r.title)] && !have.has(fold(r.title)));
   }
 
   function renderImport() {
-    const have = new Set(state.day.lectures.map(l => fold(l.title)));
+    let lastDate = '';
     $('impList').innerHTML = impRows.map((r, i) => {
-      const dup = have.has(fold(r.title));
-      return `<div class="imp-row ${r.on && !dup ? 'on' : ''} ${dup ? 'dup' : ''}" data-i="${i}">
-        <span class="check" data-act="toggle">${icon.check}</span>
-        <span class="t" dir="auto">${esc(r.title)}${dup ? ' (موجودة)' : ''}</span>
-        <button class="s ${r.subject ? 'set' : ''}" data-act="subj" dir="ltr">${esc(r.subject || 'مادة؟')}</button>
+      const head = r.date !== lastDate
+        ? `<div class="imp-day">${new Date(r.date + 'T00:00').toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long' })}</div>` : '';
+      lastDate = r.date;
+      return `${head}<div class="imp-row ${r.on ? 'on' : ''}" data-i="${i}">
+        <span class="check">${icon.check}</span>
+        <span class="t" dir="auto">${esc(r.title)}</span>
+        <span class="s set" dir="ltr">${esc(r.subject)}</span>
       </div>`;
     }).join('');
-    const n = impRows.filter(r => r.on && !have.has(fold(r.title))).length;
+    const n = impRows.filter(r => r.on).length;
     $('impAdd').textContent = n ? `أضف ${n}` : 'أضف المحددة';
-    $('impAdd').disabled = !n && $('impText').hidden;
-  }
-
-  function showRows(text) {
-    impRows = parseEvents(text).map(line => {
-      const isCourse = COURSE_CODE.test(line);
-      const raw = line.replace(COURSE_CODE, '');
-      const subject = detectSubject(raw);
-      // "Tıbbi Biyokimya - Enzim Kinetiği" → "Enzim Kinetiği" (the subject is shown on its own)
-      const m = raw.match(/^(.+?)\s*[-–—:|]\s*(.+)$/);
-      const title = subject && m && detectSubject(m[1]) === subject && !detectSubject(m[2]) ? m[2] : raw;
-      // Anything that isn't a course or a known subject (gym, meetings) starts unticked
-      return { title, subject, on: isCourse || !!subject };
-    });
-    $('impText').hidden = true;
-    $('impPaste').hidden = true;
-    $('impAdd').hidden = false;
-    $('impMsg').textContent = impRows.length
-      ? 'المحاضرات محددة ✓ والباقي لأ. اضغط على "مادة؟" لتختار مادة كل محاضرة.'
-      : 'ما لقيت أحداث بالنسخة. شغّل الاختصار أول.';
-    renderImport();
+    $('impAdd').hidden = !impRows.length;
   }
 
   function openImport() {
-    impRows = []; $('impList').innerHTML = '';
-    $('impText').hidden = true; $('impPaste').hidden = false; $('impAdd').hidden = true;
-    $('impMsg').textContent = 'شغّل اختصار "محاضرات اليوم"، وبعدين اضغط الزر تحت. الآيفون رح يطلّع كلمة Paste: اضغطها، هيك بيعطي إذن للتطبيق يقرأ اللي نسخه الاختصار.';
+    impRows = missedLectures();
+    $('impMsg').textContent = impRows.length
+      ? 'دروس من الجدول لسا ما وصلت فيها للمرحلة الثالثة. اختار اللي بدك ترجعله اليوم.'
+      : 'ما في دروس فاتتك. كل اللي انعطى لهلأ خلّصته للآخر أو موجود بقائمة اليوم.';
+    renderImport();
     $('impSheet').classList.add('open');
   }
 
-  // iOS shows its own "Paste" button here; the read only succeeds once it's tapped
-  async function pasteImport() {
-    let text = '';
-    try { text = await navigator.clipboard.readText(); } catch (e) {}
-    if (text.trim()) return showRows(text);
-    $('impPaste').hidden = true; $('impAdd').hidden = false;
-    $('impText').hidden = false; $('impText').value = '';
-    $('impMsg').textContent = 'ما قدرت أقرأ النسخ. اضغط مطوّلاً على الخانة تحت واختر لصق.';
-    renderImport();
-  }
-
   $('calBtn').addEventListener('click', openImport);
-  $('impPaste').addEventListener('click', pasteImport);
-  $('impText').addEventListener('input', (e) => { if (e.target.value.includes('\n') || e.target.value.length > 3) showRows(e.target.value); });
   $('impList').addEventListener('click', (e) => {
     const row = e.target.closest('.imp-row'); if (!row) return;
-    const r = impRows[+row.dataset.i];
-    if (e.target.closest('[data-act="subj"]')) {
-      // Cycle through subjects, then back to none
-      const i = SUBJECTS.findIndex(x => x.name === r.subject);
-      r.subject = i + 1 < SUBJECTS.length ? SUBJECTS[i + 1].name : '';
-      if (r.subject) r.on = true;
-    } else {
-      r.on = !r.on;
-    }
+    impRows[+row.dataset.i].on = !impRows[+row.dataset.i].on;
     renderImport();
   });
   $('impAdd').addEventListener('click', () => {
-    if (!$('impText').hidden && !impRows.length) showRows($('impText').value);
-    const have = new Set(state.day.lectures.map(l => fold(l.title)));
-    const add = impRows.filter(r => r.on && !have.has(fold(r.title))).map(r => newLecture(r.title, r.subject));
+    const add = impRows.filter(r => r.on).map(r => newLecture(r.title, r.subject));
     if (!add.length) return;
     const c = cur();
     if (c && !c.title && !stagesDone(c)) state.day.lectures = state.day.lectures.filter(x => x !== c);
