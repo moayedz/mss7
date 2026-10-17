@@ -18,3 +18,16 @@
 1. انشر المستودع على GitHub Pages: **Settings → Pages → Deploy from a branch** واختر الفرع والمجلد `/ (root)`.
 2. افتح الرابط في **Safari** على iPhone.
 3. اضغط زر المشاركة ← **إضافة إلى الشاشة الرئيسية**.
+
+## استيراد المحاضرات من تقويم الآيفون
+
+صفحة الويب ما بتقدر تقرأ التقويم مباشرة، فبنستخدم تطبيق **الاختصارات** (Shortcuts):
+
+1. اختصار جديد ← **Find Calendar Events**: `Start Date is Today`، مرتّبة حسب `Start Date` (واختياري `Calendar is` تقويم المحاضرات).
+2. **Get Details of Calendar Events** ← `Title`.
+3. **Combine Text** ← `New Lines`.
+4. **Copy to Clipboard**.
+
+بعد ما تشغّله، افتح التطبيق واضغط **من التقويم**. المادة بتنعرف من اسم الحدث (كلمات `keys` في `SUBJECTS`)، والأحداث اللي ما إلها مادة (النادي، المواعيد) بتطلع بدون ✓.
+
+لتشغيله تلقائياً كل صبح: الاختصارات ← **Automation** ← **Time of Day** ← اختار الاختصار و**Run Immediately**.
